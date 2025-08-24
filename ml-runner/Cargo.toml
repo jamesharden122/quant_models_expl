@@ -8,6 +8,12 @@ edition = "2021"
 
 [dependencies]
 dioxus = { version = "0.6.0", features = ["router", "fullstack"] }
+surrealdb = "2"
+anyhow = "1.0"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+polars = "0.50.0"
+ml_backend = { package = "ml-runner", path = "../ml-project/ml-runner" }
 
 [features]
 default = ["web"]

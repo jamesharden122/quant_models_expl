@@ -1,10 +1,12 @@
 import json
 from datetime import datetime
 from pathlib import Path
+import importlib
 
 import polars as pl
 import tensorflow as tf
 
+from utils import df_to_tfds
 from utils import df_to_tfds, build_model
 
 
@@ -27,6 +29,10 @@ def train_from_polars(df: pl.DataFrame, cfg_json: str) -> str:
 
     ds = df_to_tfds(df, target=target, batch=batch)
     input_dim = df.drop(target).width
+    model_module = cfg["model_module"]
+    model_fn = cfg.get("model_fn", "build_model")
+    module = importlib.import_module(model_module)
+    build_model = getattr(module, model_fn)
     model = build_model(input_dim, cfg)
     model.fit(ds, epochs=epochs)
 

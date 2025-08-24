@@ -16,6 +16,14 @@ pub fn train_via_pyo3(
     trainer_fn: &str,
     cfg_json: &str,
 ) -> Result<String> {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let py_path = base.join("../py");
+    let models_path = base.join("../models");
+    Python::with_gil(|py| {
+        let sys = py.import("sys")?;
+        let path = sys.getattr("path")?;
+        path.call_method1("append", (py_path.to_str().unwrap(),))?;
+        path.call_method1("append", (models_path.to_str().unwrap(),))?;
     let py_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../py");
     Python::with_gil(|py| {
         let sys = py.import("sys")?;
@@ -31,6 +39,14 @@ pub fn train_via_pyo3(
 
 /// Use PyO3 to call py.onnx_export.savedmodel_to_onnx_bytes and return the bytes.
 pub fn tf_savedmodel_to_onnx_bytes(saved_model_dir: &str) -> Result<Vec<u8>> {
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let py_path = base.join("../py");
+    let models_path = base.join("../models");
+    Python::with_gil(|py| {
+        let sys = py.import("sys")?;
+        let path = sys.getattr("path")?;
+        path.call_method1("append", (py_path.to_str().unwrap(),))?;
+        path.call_method1("append", (models_path.to_str().unwrap(),))?;
     let py_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../py");
     Python::with_gil(|py| {
         let sys = py.import("sys")?;
