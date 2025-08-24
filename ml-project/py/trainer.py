@@ -7,6 +7,7 @@ import polars as pl
 import tensorflow as tf
 
 from utils import df_to_tfds
+from utils import df_to_tfds, build_model
 
 
 def train_from_polars(df: pl.DataFrame, cfg_json: str) -> str:

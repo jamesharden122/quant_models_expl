@@ -24,6 +24,11 @@ pub fn train_via_pyo3(
         let path = sys.getattr("path")?;
         path.call_method1("append", (py_path.to_str().unwrap(),))?;
         path.call_method1("append", (models_path.to_str().unwrap(),))?;
+    let py_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../py");
+    Python::with_gil(|py| {
+        let sys = py.import("sys")?;
+        sys.getattr("path")?
+            .call_method1("append", (py_path.to_str().unwrap(),))?;
         let module = PyModule::import(py, trainer_module)?;
         let func = module.getattr(trainer_fn)?;
         let py_df = PyDataFrame(df.clone()).into_py(py);
@@ -42,6 +47,11 @@ pub fn tf_savedmodel_to_onnx_bytes(saved_model_dir: &str) -> Result<Vec<u8>> {
         let path = sys.getattr("path")?;
         path.call_method1("append", (py_path.to_str().unwrap(),))?;
         path.call_method1("append", (models_path.to_str().unwrap(),))?;
+    let py_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../py");
+    Python::with_gil(|py| {
+        let sys = py.import("sys")?;
+        sys.getattr("path")?
+            .call_method1("append", (py_path.to_str().unwrap(),))?;
         let module = PyModule::import(py, "onnx_export")?;
         let func = module.getattr("savedmodel_to_onnx_bytes")?;
         let bytes = func.call1((saved_model_dir,))?.extract::<Vec<u8>>()?;
