@@ -18,6 +18,8 @@ ml_backend = { package = "bento_queries", path = "../../bento_queries", optional
 pyo3-polars = "0.23.1"
 pyo3 = "0.25.1"
 serde_json = "1.0.143"
+dioxus-cli-config = { version = "0.6.0", optional = true }
+reqwest = { version = "0.11", features = ["json"] }
 
 [features]
 default = ["web"]
@@ -28,6 +30,7 @@ server = [
     "dep:ml_backend",
     "dep:axum",
     "dep:tokio",
+    "dep:dioxus-cli-config",
 ]
 
 desktop = ["dioxus/desktop"]
