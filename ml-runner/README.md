@@ -35,11 +35,6 @@ This crate can now be run in two different modes:
   ```
 
 * **Server only** – start just the backend without any UI:
-
-  ```bash
-  dx serve --platform server
-  ```
-
   From another terminal session connect to the host and trigger pipelines via
   the CLI helper:
 
@@ -57,4 +52,10 @@ When running the full-stack application, navigating to the root route renders a
 training form. The form lets you specify the trainer Python file, the TFRecord
 data file, and the callable to invoke, then executes the streaming and training
 pipelines with those parameters.
+
+  From another terminal session you can then issue commands directly against
+  the library, for example running the streaming and training pipelines:
+  cargo run --bin server --features server train
+
+  Replace `train` with the desired command
 

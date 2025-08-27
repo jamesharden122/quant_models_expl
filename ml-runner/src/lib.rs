@@ -75,13 +75,15 @@ fn TrainingForm() -> Element {
     let trainer_py = use_signal(|| "../../ml-project/py/mls_lstm_trainer.py".to_string());
     let tfrecord_path = use_signal(|| "../../tmp_data/data.tfrecord".to_string());
     let callable = use_signal(|| "train".to_string());
-
     let run_training = move |evt: FormEvent| {
         evt.prevent_default();
         let trainer_py_val = trainer_py();
         let tfrecord_val = tfrecord_path();
         let callable_val = callable();
         spawn(async move {
+    let run_training = move |evt: FormEvent| {
+        evt.prevent_default();
+        spawn(async {
             #[cfg(feature = "server")]
             {
                 let columns = vec!["Ret"];
@@ -92,6 +94,9 @@ fn TrainingForm() -> Element {
                     trainer_py_val,
                     vec![tfrecord_val],
                     callable_val,
+                    "../../ml-project/py/mls_lstm_trainer.py".to_string(),
+                    vec!["../../tmp_data/data.tfrecord".to_string()],
+                    "train".to_string(),
                 )
                 .await;
             }
@@ -115,6 +120,7 @@ fn TrainingForm() -> Element {
                 value: callable(),
                 oninput: move |evt| callable.set(evt.value())
             }
+
             button { r#type: "submit", "Run Training" }
         }
     }
