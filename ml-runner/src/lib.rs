@@ -72,6 +72,15 @@ pub async fn training_pipe(
 }
 #[component]
 fn TrainingForm() -> Element {
+    let trainer_py = use_signal(|| "../../ml-project/py/mls_lstm_trainer.py".to_string());
+    let tfrecord_path = use_signal(|| "../../tmp_data/data.tfrecord".to_string());
+    let callable = use_signal(|| "train".to_string());
+    let run_training = move |evt: FormEvent| {
+        evt.prevent_default();
+        let trainer_py_val = trainer_py();
+        let tfrecord_val = tfrecord_path();
+        let callable_val = callable();
+        spawn(async move {
     let run_training = move |evt: FormEvent| {
         evt.prevent_default();
         spawn(async {
@@ -82,6 +91,9 @@ fn TrainingForm() -> Element {
                 let _ = streaming_pipe(columns, "1d", where_cond, None).await;
                 let _ = training_pipe(
                     None,
+                    trainer_py_val,
+                    vec![tfrecord_val],
+                    callable_val,
                     "../../ml-project/py/mls_lstm_trainer.py".to_string(),
                     vec!["../../tmp_data/data.tfrecord".to_string()],
                     "train".to_string(),
@@ -93,6 +105,22 @@ fn TrainingForm() -> Element {
 
     rsx! {
         form { onsubmit: run_training,
+            label { "Trainer Python file" }
+            input {
+                value: trainer_py(),
+                oninput: move |evt| trainer_py.set(evt.value())
+            }
+            label { "TFRecord file" }
+            input {
+                value: tfrecord_path(),
+                oninput: move |evt| tfrecord_path.set(evt.value())
+            }
+            label { "Callable name" }
+            input {
+                value: callable(),
+                oninput: move |evt| callable.set(evt.value())
+            }
+
             button { r#type: "submit", "Run Training" }
         }
     }
