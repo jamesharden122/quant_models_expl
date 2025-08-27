@@ -1,45 +1,77 @@
-use dioxus::prelude::*;
-use anyhow::Result;
-use serde::Deserialize;
-use surrealdb::{engine::any::Any, Surreal};
-use ml_backend::{make_df_from_surreal, train_via_pyo3};
-use polars::prelude::DataFrame;
+pub mod pyexec;
+pub mod surr_queries;
 
-#[derive(Deserialize)]
-struct ModelRow {
+use dioxus::prelude::*;
+#[cfg(feature = "server")]
+use ml_backend::{polars_ops, surreal_queries};
+use polars::prelude::DataFrame;
+use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::Path;
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+struct Model {
     name: String,
 }
 
-async fn fetch_models(term: &str) -> Result<Vec<String>> {
-    let db = Surreal::new::<Any>("http://localhost:8000").await?;
-    db.use_ns("research").use_db("deeplearning").await?;
-    let sql = format!("SELECT name FROM models WHERE name CONTAINS '{}';", term);
-    let mut resp = db.query(sql).await?;
-    let rows: Vec<ModelRow> = resp.take(0)?;
-    Ok(rows.into_iter().map(|r| r.name).collect())
-}
-
-async fn train_model(model: String) -> Result<()> {
-    let db = Surreal::new::<Any>("http://localhost:8000").await?;
-    db.use_ns("research").use_db("deeplearning").await?;
-    let sql = format!("SELECT * FROM data WHERE model = '{model}';");
-    let df: DataFrame = make_df_from_surreal(&db, &sql).await?;
-    let cfg = format!("{{\"target\":\"close\",\"epochs\":10,\"batch\":64,\"outdir\":\"models\"}}",
+#[server]
+#[cfg(feature = "server")]
+async fn streaming_pipe<'a>(
+    column_set: vec<&'a str>,
+    bin_size: &'a str,
+    where_cond: polars_ops::PartEqSurr,
+    writer_path: Option<String>,
+) -> Result<(), ServerFnError> {
+    let db = surreal_queries::make_db?;
+    let df: DataFrame = surr_queries::query_feature_bin_demo(db, column_set, bin_size, where_cond)?;
+    pyexec::write_tfrecord_from_polars(
+        &df,
+        &Path::new(writer_path.unwrap_or("../../ml-project/py/pl2tfrecord_writer.py")),
+        "../../tmp_data/",
+        None,
+        true,
     );
-    let _ = train_via_pyo3(&df, "trainer", "train_from_polars", &cfg)?;
     Ok(())
 }
 
-pub fn app(cx: Scope) -> Element {
-    let search = use_state(cx, || String::new());
-    let selected = use_state(cx, || None as Option<String>);
-    let models = use_future(cx, search, |search| {
+#[server]
+async fn training_pipe(
+    reader_py_path: Option<String>,
+    trainer_py_path: String,
+    tfrecord_paths: Vec<String>,
+    callable_name: String,
+) -> Result<(), ServerFnError> {
+    let feature_spec = BTreeMap::new();
+    let df = pyexec::load_tf_record_dataset(
+        Path::new(reader_py_path.unwrap_or("../../ml-project/py/pl2tfrecord_writer.py")),
+        tfrecord_paths,
+        &feature_spec,
+        Some("Ret"),
+        512,
+        true,
+        true,
+    );
+    let out = pyexec::train::run_mls_lstm_training(
+        Path::new(trainer_py_path),
+        callable_name.as_str(),
+        df,
+        None,
+        None,
+        fit_kwargs,
+    );
+}
+#[component]
+pub fn app() -> Element {
+    let _search = use_signal(String::new);
+    let _selected = use_signal(|| None as Option<String>);
+    /*let models = use_future(cx, search, |search| {
         let term = search.current().clone();
         async move { fetch_models(&term).await.unwrap_or_default() }
-    });
+    });*/
 
-    cx.render(rsx! {
-        div { class: "model-trainer",
+    rsx! {
+        /*div { class: "model-trainer",
             input {
                 value: "{search}",
                 placeholder: "Search models...",
@@ -68,6 +100,6 @@ pub fn app(cx: Scope) -> Element {
                 },
                 "Train"
             }
-        }
-    })
+        }*/
+    }
 }
