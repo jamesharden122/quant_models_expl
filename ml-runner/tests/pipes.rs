@@ -22,7 +22,7 @@ use wrds_io::finance_data_structs::crsp::finance_tickers;
 async fn streaming_pipe_smoke() {
     pyo3::prepare_freethreaded_python();
     let db_params = DbParams {
-        url: "https://quant-platform-06cb0tpcrpsspao10de28go15s.aws-use1.surreal.cloud/rpc"
+        url: ""
             .to_string(),
         user: "root".to_string(),
         pass: "root".to_string(),
@@ -75,8 +75,8 @@ async fn streaming_pipe_smoke() {
 async fn streaming_pipe_mls_sharpe_smoke() {
     pyo3::prepare_freethreaded_python();
     let db_params = DbParams {
-        url: "https://quant-platform-06cb0tpcrpsspao10de28go15s.aws-use1.surreal.cloud/rpc"
-            .to_string(),
+        url: 
+        "".to_string(),
         user: "root".to_string(),
         pass: "root".to_string(),
         ns: "equities".to_string(),

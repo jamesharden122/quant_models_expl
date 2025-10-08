@@ -12,7 +12,7 @@ async fn run_backtest_series_fails_with_invalid_db() -> Result<(), ServerFnError
     // Use an invalid scheme so SurrealDB initialization fails immediately.
     let run_backtest_request = RunBacktestRequest {
         db: DbParams {
-            url: "https://quant-platform-06cb0tpcrpsspao10de28go15s.aws-use1.surreal.cloud/rpc"
+            url: ""
                 .to_string(),
             user: "root".to_string(), pass: "root".to_string(),
             ns: "equities".to_string(), dbname: "historical".to_string(),

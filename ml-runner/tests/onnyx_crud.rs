@@ -15,12 +15,12 @@ async fn onnyx_package_and_upload_surml() {
     pyo3::prepare_freethreaded_python();
     // Resolve paths
     let onnx_path_default = 
-        "/home/yakaman/Dropbox/Desktop/tesero-sol/software_development/trading/quant_models_expl/ml-project/models/saved/mls_lstm_20250911_184101/final_model.onnx";
+        "./ml-project/models/saved/mls_lstm_20250911_184101/final_model.onnx";
     let onnx_path = std::env::var("ONNX_PATH").unwrap_or_else(|_| onnx_path_default.to_string());
     let surml_out = std::env::var("SURML_OUT").unwrap_or_else(|_| "../tmp_data/final_model.surml".to_string());
 
     // Surreal connection (env-overridable)
-    let url = "https://quant-platform-06cb0tpcrpsspao10de28go15s.aws-use1.surreal.cloud/ml/import".to_string();
+    let url = "".to_string();
     let namespace = std::env::var("SUR_NS").unwrap_or_else(|_| "equities".to_string());
     let database = std::env::var("SUR_DB").unwrap_or_else(|_| "historical".to_string());
     let username = std::env::var("SUR_USER").unwrap_or_else(|_| "root".to_string());
