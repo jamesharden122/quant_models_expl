@@ -5,14 +5,19 @@ use ml_runner::app;
 
 fn main() {
     #[cfg(feature = "server")]
-    tokio::runtime::Runtime::new()
+    {
+        // Optionally switch to the ort-candle backend via env.
+        if std::env::var("ORT_BACKEND").ok().as_deref() == Some("candle") {
+            ml_runner::inference::init_candle_backend();
+        }
+        tokio::runtime::Runtime::new()
         .unwrap()
         .block_on(launch_server());
+    }
     #[cfg(not(feature = "server"))]
     dioxus::launch(app);
 }
 
-#[cfg(feature = "server")]
 async fn launch_server() {
     dioxus::logger::initialize_default();
 

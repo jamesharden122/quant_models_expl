@@ -1,4 +1,6 @@
 tensorflow>=2.16
-polars==0.50.0
+polars>=1.31
 numpy
+onnxruntime
 tf2onnx
+

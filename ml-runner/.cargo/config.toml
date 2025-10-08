@@ -1,0 +1,3 @@
+[env]
+PYO3_PYTHON = { value = "/home/yakaman/Dropbox/Desktop/tesero-sol/software_development/trading/quant_models_expl/ml-project/.venv/bin/python3", force = true }
+

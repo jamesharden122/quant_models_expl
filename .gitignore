@@ -1,7 +1,88 @@
-target/
-__pycache__/
-*.egg-info
-*.pyc
-*.pyo
-.env
+# ===============================
+# Global Ignores
+# ===============================
 .DS_Store
+Thumbs.db
+*.log
+*.tmp
+tmp_data/
+*.bak
+*.swp
+
+# ===============================
+# Rust / Cargo (ml-runner)
+# ===============================
+# Build outputs
+target/
+# IDE / Rust tooling
+**/*.rs.bk
+**/.idea/
+**/.vscode/
+**/.cargo-ok
+# Temporary build artifacts
+**/*.rlib
+**/*.rmeta
+**/*.dSYM
+**/Cargo.lock
+# (Optionally keep root Cargo.lock if this is a workspace-wide lock)
+# !/ml-runner/Cargo.lock
+
+# ===============================
+# Python / ML (ml-project)
+# ===============================
+# Virtual environments
+.venv/
+env/
+venv/
+# Compiled files
+__pycache__/
+*.py[cod]
+*.so
+# Package and build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+# Jupyter and caches
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.pyre/
+# Temporary experiment output
+models/
+assets/
+server_requests_test.txt
+
+# ===============================
+# OS / Editor
+# ===============================
+*.kate-swp
+*.sublime-workspace
+*.sublime-project
+*~
+.vscode/
+.idea/
+*.iml
+
+# ===============================
+# Custom project paths
+# ===============================
+# Temp data and exports
+tmp_data/
+surrealml-core-patched/
+# Optional: local testing scripts
+**/scratch_*.py
+**/test_*.csv
+**/debug_*.json
+
+# ===============================
+# Makefile and Docs
+# ===============================
+# keep Makefiles, readmes, configs
+!Makefile
+!README.md
+!Cargo.toml
+!requirements.txt
+!Dioxus.toml
+!clippy.toml
+
