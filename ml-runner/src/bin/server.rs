@@ -10,7 +10,7 @@ use axum::{
 };
 use dioxus::prelude::*;
 use ml_backend::{
-    featscreate::{FeatList, MomFactor},
+    featscreate::{FeatList, globalindexes::GlobalIndexes, momindexes::MomFactor},
     surreal_queries::DbParams,
 };
 use ml_runner::backtest::helpers::{

@@ -56,9 +56,18 @@ impl TseriesTfRecBento {
         Ok(kw)
     }
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TsPolWrdsMarket {
+    pub data_path: String,
+    pub column_set: Vec<String>, // Columns to fetch from DB
+    pub srt: Option<Vec<String>>,
+    pub query_params: Option<(Vec<String>, NaiveDate, NaiveDate)>,
+    pub feature_names: Option<Vec<FeatList>>,
+    pub polars_schema: polars::prelude::Schema,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TseriesTfRecWrdsGlobalInd {
+pub struct TseriesTfRecWrdsMarket {
     pub data_path: String,
     pub column_set: Vec<String>, // Columns to fetch from DB
     pub srt: Option<Vec<String>>,
@@ -78,9 +87,10 @@ pub struct TseriesTfRecWrdsGlobalInd {
     pub return_col: Option<String>,
     pub cost_col: Option<String>,
     pub sigma_col: Option<String>,
+    pub polars_schema: polars::prelude::Schema,
 }
 
-impl TseriesTfRecWrdsGlobalInd {
+impl TseriesTfRecWrdsMarket {
     pub fn to_pydict<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyDict>> {
         let kw = PyDict::new(py);
 

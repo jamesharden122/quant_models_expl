@@ -2,7 +2,7 @@
 use ml_runner::backtest::{helpers::*,run_backtest_series,};
 #[cfg(feature = "server")]
 use ml_backend::{
-    featscreate::{FeatList, apply_by_names, MomFactor},
+    featscreate::{FeatList, apply_by_names, globalindexes::GlobalIndexes, momindexes::MomFactor},
     surreal_queries::DbParams,
 };
 use dioxus::prelude::ServerFnError;
