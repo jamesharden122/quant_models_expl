@@ -4,7 +4,6 @@ pub mod onnx;
 pub mod ort_candle;
 
 #[cfg(feature = "server")]
-pub use onnx::{onnx_infer, surml_infer, surml_infer_raw};
+pub use onnx::onnx_infer;
 #[cfg(feature = "server")]
 pub use ort_candle::{init_candle_backend, onnx_infer_candle};
-

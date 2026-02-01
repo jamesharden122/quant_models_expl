@@ -1,5 +1,6 @@
 #[cfg(feature = "server")]
 pub mod backtest;
+pub mod error;
 #[cfg(feature = "server")]
 pub mod inference;
 pub mod pipelines;

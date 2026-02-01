@@ -1,26 +1,18 @@
 pub mod pydictstructs;
 pub mod train;
 use crate::surr_queries;
-use anyhow::Result;
+use crate::error::{msg, Result};
 use polars::prelude::*;
 #[cfg(feature = "server")]
 use pydictstructs::{MlsLstmTrain, TseriesTfRecBento, TseriesTfRecLoad};
 use pyo3::prelude::*;
-use pyo3::types::{IntoPyDict, PyAny, PyDict, PyList, PyModule, PyTuple};
+use pyo3::types::{PyAny, PyDict, PyModule, PyTuple};
 use pyo3_polars::types::PyDataFrame;
 use serde_json::Value;
-use std::collections::BTreeMap;
 use std::ffi::CString;
-use std::fs;
 use std::path::Path;
 #[cfg(feature = "server")]
 use surrealdb::{engine::any, sql::Bytes, Surreal};
-#[cfg(feature = "server")]
-use surrealml_core::storage::{
-    header::normalisers::{linear_scaling::LinearScaling, wrapper::NormaliserType},
-    header::Header,
-    surml_file::SurMlFile,
-};
 
 /// Load & execute a Python module from a file path, returning the live module.
 /// Registers the module in `sys.modules[name]` for subsequent imports.
@@ -57,11 +49,13 @@ pub fn write_tfrecord_from_polars(
         // Convert to Python polars.DataFrame
         // Import writer module from file
         let name = "pl2tfrecord_writer";
-        let module = import_module_from_path(py, name, writer_py_path.to_str().unwrap())?;
-        let func = module.getattr(attr)?;
+        let module = import_module_from_path(py, name, writer_py_path.to_str().unwrap())
+            .map_err(|e| msg(e.to_string()))?;
+        let func = module.getattr(attr).map_err(|e| msg(e.to_string()))?;
         println!("we got here");
         // Call: write_tfrecord_from_polars(py_df, out_path, label, compress)
-        func.call((), Some(kwargs.bind(py)))?;
+        func.call((), Some(kwargs.bind(py)))
+            .map_err(|e| msg(e.to_string()))?;
         Ok(())
     })
 }
@@ -94,92 +88,6 @@ pub fn load_tfrecord_dataset(input_struct: TseriesTfRecLoad) -> PyResult<Py<PyAn
         );
         Ok(ds)
     })
-}
-
-/// Build .surml in Rust from an ONNX file, then call Python SurMlFile.upload(...)
-#[cfg(feature = "server")]
-pub async fn package_and_upload_surml(
-    onnx_path: &str,
-    surml_out: &str,
-    url: &str,
-    chunk_size: usize,
-    namespace: &str,
-    database: &str,
-    username: &str,
-    password: &str,
-) -> Result<()> {
-    // 1) Read ONNX bytes
-    let model_bytes = fs::read(onnx_path)?;
-
-    // 2) Build header (example — swap in your real feature/output names + normalisers)
-    let mut header = Header::fresh();
-    header.add_column("squarefoot".to_string());
-    header.add_column("num_floors".to_string());
-    header.add_output("house_price".to_string(), None);
-
-    header.add_normaliser(
-        "squarefoot".to_string(),
-        NormaliserType::LinearScaling(LinearScaling { min: 0.0, max: 1.0 }),
-    );
-    header.add_normaliser(
-        "num_floors".to_string(),
-        NormaliserType::LinearScaling(LinearScaling { min: 0.0, max: 1.0 }),
-    );
-
-    // 3) Create .surml and write to disk
-    let surml = SurMlFile::new(header, model_bytes);
-    surml.write(surml_out)?;
-
-    // 4) Call Python client: SurMlFile.upload(path=..., url=..., ...)
-    upload_surml_via_python(
-        surml_out, url, chunk_size, namespace, database, username, password,
-    )
-    .await?;
-
-    Ok(())
-}
-
-/// PyO3 bridge that calls the official Python uploader.
-#[cfg(feature = "server")]
-async fn upload_surml_via_python(
-    path: &str,
-    url: &str,
-    chunk_size: usize,
-    namespace: &str,
-    database: &str,
-    username: &str,
-    password: &str,
-) -> Result<()> {
-    let path = path.to_string();
-    let url = url.to_string();
-    let ns = namespace.to_string();
-    let db = database.to_string();
-    let user = username.to_string();
-    let pass = password.to_string();
-
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-        Python::with_gil(|py| -> anyhow::Result<()> {
-            // Import whichever module exposes SurMlFile in your env
-            let m = py
-                .import("surrealml")
-                .or_else(|_| py.import("surrealml_core"))?;
-
-            let surml_cls = m.getattr("SurMlFile")?;
-            let kwargs = PyDict::new(py);
-            kwargs.set_item("path", &path)?;
-            kwargs.set_item("url", &url)?;
-            kwargs.set_item("chunk_size", chunk_size)?;
-            kwargs.set_item("namespace", &ns)?;
-            kwargs.set_item("database", &db)?;
-            kwargs.set_item("username", &user)?;
-            kwargs.set_item("password", &pass)?;
-
-            surml_cls.getattr("upload")?.call((), Some(&kwargs))?;
-            Ok(())
-        })
-    })
-    .await?;
-    Ok(())
 }
 
 /*Load TFRecord(s) into a tf.data.Dataset (returned as PyObject).

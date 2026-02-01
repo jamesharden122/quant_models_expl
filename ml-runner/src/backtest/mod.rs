@@ -11,13 +11,13 @@ use crate::inference::onnx_infer_candle;
 #[cfg(feature = "server")]
 use crate::surr_queries;
 #[cfg(feature = "server")]
-use ml_backend::{featscreate::apply_by_names, surreal_queries::DbParams};
+use helpers::*;
+pub use helpers::{BacktestKind, BacktestParams, RunBacktestRequest};
 #[cfg(feature = "server")]
 use historical::*;
-#[cfg(feature = "server")]
-use helpers::*;
 use metric::*;
-pub use helpers::{BacktestKind, BacktestParams, RunBacktestRequest};
+#[cfg(feature = "server")]
+use ml_backend::{featscreate::apply_by_names, surreal_queries::DbParams};
 
 #[cfg(feature = "server")]
 trait Backtest {
@@ -33,7 +33,6 @@ trait Backtest {
         bench_col: Option<&str>,
     ) -> PolarsResult<BacktestOutput>;
 }
-
 
 #[cfg(feature = "server")]
 fn make_backtest(kind: BacktestKind) -> Box<dyn Backtest + Send + Sync> {

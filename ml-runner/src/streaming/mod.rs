@@ -13,10 +13,14 @@ use polars::prelude::*;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3_polars::types::PyDataFrame;
-use std::{path::Path, sync::Arc};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 #[cfg(feature = "server")]
 use wrds_io::{
     finance_data_structs::crsp,
+    finance_data_structs::global_equities,
     finance_data_structs::usindexes,
     finance_data_structs::world_indices,
     instantiatedb::duckdbinst::{open_duck_db_from_file, start_duck_db, DbType},
@@ -106,22 +110,25 @@ pub async fn streaming_pipe_wrds_duck(
     //Read data from parquet file to the duck database//
     //************************************************//
     let conn = if load_frm_parq {
-        let conn = Arc::new(
+        let conn = Arc::new(Mutex::new(
             start_duck_db("4GB", 14)
                 .await
                 .expect("duckdb in-memory should start"),
-        );
+        ));
         dbt.ingest(conn.clone(), pth.unwrap()).await.unwrap();
         conn
     } else {
-        Arc::new(
+        Arc::new(Mutex::new(
             open_duck_db_from_file(pth.unwrap(), "4GB", 14)
                 .await
                 .expect("duckdb in-memory should start"),
-        )
+        ))
     };
-    let mut stmt = conn.prepare(format!("DESCRIBE  {}", tbl).as_str()).unwrap(); //
-    let _rows = stmt.query([]).unwrap();
+    {
+        let conn = conn.lock().unwrap();
+        let mut stmt = conn.prepare(format!("DESCRIBE  {}", tbl).as_str()).unwrap(); //
+        let _rows = stmt.query([]).unwrap();
+    }
     //*************************************************//
     //Filter data base)d on the tickers and a date tuple and convert to dataframe//
     //*************************************************//
@@ -143,6 +150,16 @@ pub async fn streaming_pipe_wrds_duck(
         DbType::UsMarket => usindexes::UsMarketIndex::read_range(conn.clone(), (d1, d2))
             .await
             .unwrap(),
+        DbType::GlobalEquities => {
+            global_equities::GlobalEquities::read_range(conn.clone(), (d1, d2))
+                .await
+                .unwrap()
+        }
+        other => {
+            return Err(ServerFnError::new(format!(
+                "DbType {other:?} is not supported by streaming_pipe_wrds_duck"
+            )))
+        }
     };
     let mut df = DataFrame::from_rows_and_schema(&data, &kwargs_struct.polars_schema).unwrap();
     df = match pre_features_filter {

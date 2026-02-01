@@ -8,7 +8,7 @@ use ml_backend::{
         momindexes::MomFactor,
         FeatList,
     },
-    polars_ops,
+    listtobin, polars_ops,
     surreal_queries::DbParams,
 };
 #[cfg(feature = "server")]
@@ -17,22 +17,47 @@ use ml_runner::pyexec::pydictstructs::{
 };
 #[cfg(feature = "server")]
 use ml_runner::{
-    streaming::streaming_pipe, streaming::streaming_pipe_wrds_duck,
-    streaming::strmpolars::streaming_pipe_wrds_duck_polars, training::training_pipe,
+    streaming::streaming_pipe,
+    streaming::streaming_pipe_wrds_duck,
+    streaming::strmpolars::{
+        streaming_pipe_merge_wrds_duck_polars, streaming_pipe_wrds_duck_polars,
+    },
+    training::training_pipe,
 };
 use polars::prelude::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fs::File, time::Instant};
+
+#[cfg(feature = "server")]
+use std::path::{Path, PathBuf};
+#[cfg(feature = "server")]
+use wrds_io::createdatasets::usbanks::{BankCrspDly, BankCrspPaths};
+#[cfg(feature = "server")]
+use wrds_io::createdatasets::{CreateDuckFls, MergeDuckFls};
 #[cfg(feature = "server")]
 use wrds_io::{
     finance_data_structs::{
         crsp::{finance_tickers, GlobalDailyIndex},
         usindexes::UsMarketIndex,
         world_indices::GlobalRets,
-        ToPolars,
+        DuckCrudModel, ToPolars,
     },
     instantiatedb::duckdbinst::DbType,
 };
 
+#[cfg(feature = "server")]
+fn expand_tilde(path: &str) -> PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(rest);
+        }
+    }
+    if path == "~" {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home);
+        }
+    }
+    PathBuf::from(path)
+}
 #[tokio::test]
 #[cfg(feature = "server")]
 async fn streaming_pipe_smoke() {
@@ -139,7 +164,7 @@ async fn streaming_pipe_mls_sharpe_smoke() {
     );
 }
 
-// RAYON_NUM_THREADS=14 POLARS_MAX_THREADS=14 cargo test  --features server streaming_pipe_global_comp_smoke -- --no-capture --test-threads=1
+// RAYON_NUM_THREADS=14 POLARS_MAX_THREADS=14 cargo test  --features server streaming_pipe_global_comp_smhttps://docs.rs/ort-candle/0.1.0+0.8/ort_candle/oke -- --no-capture --test-threads=1
 #[cfg(feature = "server")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn streaming_pipe_global_comp_smoke() {
@@ -257,7 +282,7 @@ async fn streaming_pipe_world_indices_smoke() {
 async fn streaming_pipe_wrldind_mrk_ind_merge_smoke() {
     pyo3::prepare_freethreaded_python();
     let kwargs_gind = TsPolWrdsMarket {
-        data_path: "../../data/raw_files/parqueut/country_returns_wide.parquet".to_string(),
+        data_path: "/home/yakaman/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/country_indexes/monthly/country_returns_wide.parquet".to_string(),
         column_set: vec![],
         srt: None,
         query_params: Some((
@@ -270,7 +295,7 @@ async fn streaming_pipe_wrldind_mrk_ind_merge_smoke() {
     };
 
     let kwargs_mind = TsPolWrdsMarket {
-        data_path: "../../data/raw_files/parqueut/crsp_ciz_sample/market_index/market_indexes_daily.parquet".to_string(),
+        data_path: "/home/yakaman/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/crsp_ciz_sample/market_index/monthly/market_indexes_monthly.parquet".to_string(),
         column_set: vec![],
         srt: None,
         query_params: Some((
@@ -288,6 +313,7 @@ async fn streaming_pipe_wrldind_mrk_ind_merge_smoke() {
         true,
         "global_sec_indexes_daily",
         None,
+        false,
     )
     .await;
     let res_market = streaming_pipe_wrds_duck_polars(
@@ -296,10 +322,30 @@ async fn streaming_pipe_wrldind_mrk_ind_merge_smoke() {
         true,
         "us_market_indexes_daily",
         None,
+        false,
     )
     .await;
     let mut dfm = res_market.unwrap();
+    dfm = dfm
+        .lazy()
+        .with_columns([col("date")
+            .cast(DataType::Date)
+            .dt()
+            .truncate(lit("1mo"))
+            .alias("date")])
+        .collect()
+        .unwrap();
     let mut dfg = res_global.unwrap();
+    dfg = dfg
+        .lazy()
+        .with_columns([col("date")
+            .cast(DataType::Date)
+            .dt()
+            .truncate(lit("1mo"))
+            .alias("date")])
+        .collect()
+        .unwrap();
+
     let dfg_drop_cols: Vec<&str> = vec![];
     let dfm_drop_cols: Vec<&str> = vec!["spindx", "totcnt", "totval", "usdcnt", "usdval"];
     dfg = polars_ops::utils::drop_columns(dfg, dfg_drop_cols).unwrap();
@@ -308,6 +354,8 @@ async fn streaming_pipe_wrldind_mrk_ind_merge_smoke() {
     println!("global df: {:?}", dfm.head(Some(30)));
     println!("market column names {:?}", dfm.get_column_names());
     let mut out = dfg.left_join(&dfm, ["date"], ["date"]).unwrap();
+    println!("shape: {:?}", out.shape());
+    //listtobin::iterate_and_match_polars_df("../tmp_data", out.clone()).await;
     out = polars_ops::utils::drop_columns(out, vec!["date"]).unwrap();
     out = apply_by_names(
         out,
@@ -321,9 +369,9 @@ async fn streaming_pipe_wrldind_mrk_ind_merge_smoke() {
     println!("global df: {:?}", out.head(Some(30)));
 
     // Write merged DataFrame to CSV at crate root
-    use polars::prelude::CsvWriter;
-    use std::fs::File;
-    let mut f = File::create("./world_market_merged.csv").expect("create csv file at repo root");
+
+    let mut f =
+        File::create("./world_market_merged_monthly.csv").expect("create csv file at repo root");
     let mut out_to_write = out.clone();
     CsvWriter::new(&mut f)
         .finish(&mut out_to_write)
@@ -440,4 +488,96 @@ async fn training_pipe_mls_sharpe_smoke() {
 
     let res = training_pipe(inp_param, trn_param).await.unwrap();
     println!("{:?}", res);
+}
+
+// Mirrors `words_db/tests/createdatasets_enum_usbank_crsp_dly_polars.rs:create_and_merge_usbank_crsp_dly_enum_to_polars_df`,
+// but runs through `ml_runner::streaming::strmpolars::streaming_pipe_merge_wrds_duck_polars`.
+#[cfg(feature = "server")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn strm_pipe_merge_wrds_duck_plrs_smoke() {
+    let bhck_crsp = expand_tilde("~/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/bank_regulatory/bhck_crsp_link/bhck_crsp_link_file.parquet");
+    let crsp_mthly = expand_tilde("~/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/crsp/us_bhc/monthly_usbank_crsp.parquet");
+    let ff_mthly = expand_tilde("~/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/factors/us/monthly_ff_factors.parquet");
+    let crsp_dly = expand_tilde("~/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/crsp/us_bhc/daily_usbank_crsp.parquet");
+    let ff_dly = expand_tilde("~/Dropbox/Desktop/tesero-sol/software_development/trading/data/raw_files/parquet/factors/us/daily_ff_factors.parquet");
+
+    for p in [&bhck_crsp, &crsp_mthly, &ff_mthly, &crsp_dly, &ff_dly] {
+        assert!(p.exists(), "missing parquet input: {}", p.display());
+    }
+    let tm = Instant::now();
+
+    let base_dir = Path::new("/home/yakaman/Dropbox/Desktop/banking/data/equities");
+    let duckdb_dir = base_dir.join("duckdb");
+    let polars_cache_dir = base_dir.join("polars_cache");
+    let duckdb_source_dir = duckdb_dir.join("source");
+    let duckdb_merge_dir = duckdb_dir.join("merged");
+
+    std::fs::create_dir_all(&duckdb_source_dir).expect("create duckdb source dir");
+    std::fs::create_dir_all(&duckdb_merge_dir).expect("create duckdb merged dir");
+    std::fs::create_dir_all(&polars_cache_dir).expect("create polars cache dir");
+
+    let cache_file = polars_cache_dir.join("bank_securities_dly.plrs");
+
+    let create = CreateDuckFls::UsBankCrsp(BankCrspPaths {
+        bhck_crsp: Some(vec![bhck_crsp.to_string_lossy().to_string()]),
+        crsp_mthly: Some(vec![crsp_mthly.to_string_lossy().to_string()]),
+        ff_mthly: Some(vec![ff_mthly.to_string_lossy().to_string()]),
+        crsp_dly: Some(vec![crsp_dly.to_string_lossy().to_string()]),
+        ff_dly: Some(vec![ff_dly.to_string_lossy().to_string()]),
+    });
+
+    let bhck_crsp_duck = duckdb_source_dir.join("bhck_crsp_link.duckdb");
+    let us_crsp_dly_duck = duckdb_source_dir.join("us_crsp_dly.duckdb");
+    let ff_dly_duck = duckdb_source_dir.join("fama_french_daily.duckdb");
+
+    let merge = MergeDuckFls::UsBankCrspDly(BankCrspDly {
+        bhck_crsp: bhck_crsp_duck.to_string_lossy().to_string(),
+        crsp_dly: us_crsp_dly_duck.to_string_lossy().to_string(),
+        ff_dly: ff_dly_duck.to_string_lossy().to_string(),
+    });
+    println!("Create Duck Files Time: {:?}", tm.elapsed());
+    let df = streaming_pipe_merge_wrds_duck_polars(
+        Some((create, &duckdb_source_dir)),
+        Some(merge),
+        Some(cache_file.clone()),
+        None,
+        "20GB",
+        10,
+        &duckdb_merge_dir,
+        "bank_securities_dly",
+    )
+    .await
+    .expect("merge+polars should succeed");
+    println!(
+        "Merge and Read Duck Files as Polars DataFrame  Time: {:?}",
+        tm.elapsed()
+    );
+    assert!(df.height() > 0, "expected non-empty DataFrame");
+    println!("{:?}", df.head(Some(30)));
+
+    assert!(
+        duckdb_merge_dir.join("bank_securities_dly.duckdb").exists(),
+        "expected merged duckdb file in {}",
+        duckdb_merge_dir.display()
+    );
+    assert!(
+        cache_file.exists(),
+        "expected cache file at {}",
+        cache_file.display()
+    );
+
+    let df_cached = streaming_pipe_merge_wrds_duck_polars(
+        None,
+        None,
+        Some(cache_file),
+        None,
+        "7GB",
+        1,
+        Path::new("unused"),
+        "bank_securities_dly",
+    )
+    .await
+    .expect("cache load should succeed");
+    println!("Read Cache DataFrame Time: {:?}", tm.elapsed());
+    println!("{:?}", df_cached.head(Some(30)));
 }

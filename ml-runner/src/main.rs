@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::*;
-use dioxus_logger::tracing;
 use ml_runner::app;
 
 fn main() {
