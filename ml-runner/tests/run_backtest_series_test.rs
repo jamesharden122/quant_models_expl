@@ -1,21 +1,22 @@
 #![cfg(feature = "server")]
-use ml_runner::backtest::{helpers::*,run_backtest_series,};
+use dioxus::prelude::ServerFnError;
 #[cfg(feature = "server")]
 use ml_backend::{
-    featscreate::{FeatList, apply_by_names, globalindexes::GlobalIndexes, momindexes::MomFactor},
+    featscreate::{apply_by_names, globalindexes::GlobalIndexes, momindexes::MomFactor, FeatList},
     surreal_queries::DbParams,
 };
-use dioxus::prelude::ServerFnError;
+use ml_runner::backtest::{helpers::*, run_backtest_series};
 #[tokio::test]
 #[cfg(feature = "server")]
-async fn run_backtest_series_fails_with_invalid_db() -> Result<(), ServerFnError>{
+async fn run_backtest_series_fails_with_invalid_db() -> Result<(), ServerFnError> {
     // Use an invalid scheme so SurrealDB initialization fails immediately.
     let run_backtest_request = RunBacktestRequest {
         db: DbParams {
-            url: ""
-                .to_string(),
-            user: "root".to_string(), pass: "root".to_string(),
-            ns: "equities".to_string(), dbname: "historical".to_string(),
+            url: "".to_string(),
+            user: "root".to_string(),
+            pass: "root".to_string(),
+            ns: "equities".to_string(),
+            dbname: "historical".to_string(),
         },
         query: DataQuery {
             column_set: vec![
@@ -38,10 +39,13 @@ async fn run_backtest_series_fails_with_invalid_db() -> Result<(), ServerFnError
             onnx_model_path: "./../ml-project/models/saved/test/final_model.onnx".to_string(),
         },
         cols: ColumnCfg {
-            feature_cols: vec![ 
-                "ret_sma20".to_string(), "ret_sma50".to_string(), 
-                "ret_ema_small_pt1".to_string(), "ret_ema_large_pt6".to_string(), 
-                "ret_var10".to_string() ,"ret_macd1s6l".to_string()
+            feature_cols: vec![
+                "ret_sma20".to_string(),
+                "ret_sma50".to_string(),
+                "ret_ema_small_pt1".to_string(),
+                "ret_ema_large_pt6".to_string(),
+                "ret_var10".to_string(),
+                "ret_macd1s6l".to_string(),
             ],
             return_col: "ret".to_string(),
             sigma_col: "sigma".to_string(),
@@ -63,16 +67,12 @@ async fn run_backtest_series_fails_with_invalid_db() -> Result<(), ServerFnError
             csv_path: String::from("../tmp_data/ml_runner_bt_invalid_db.csv"),
         },
         time: None,
-        /*Some(TimeCost { 
-            time_col: "bin", 
-            time_star: String::from("2025-07-15T10:25:00Z"), 
+        /*Some(TimeCost {
+            time_col: "bin",
+            time_star: String::from("2025-07-15T10:25:00Z"),
             time_end: String::From("2025-07-15T1l:25:00Z")
         }),*/
     };
-    run_backtest_series(
-        run_backtest_request,
-    )
-    .await?;
+    run_backtest_series(run_backtest_request).await?;
     Ok(())
 }
-

@@ -12,25 +12,15 @@ struct Model {
 }
 
 #[cfg(feature = "server")]
-pub async fn query_feature_bin_demo(
-    db: &Surreal<any::Any>,
-    column_set: Vec<&str>,
-    bin_size: String,
-    inst_id: Vec<i64>,
-    srt: Option<Vec<String>>,
-) -> surrealdb::Result<(DataFrame)> {
+pub async fn query_feature_bin_demo(db: &Surreal<any::Any>, column_set: Vec<&str>, bin_size: String, inst_id: Vec<i64>, srt: Option<Vec<String>>) -> surrealdb::Result<(DataFrame)> {
     let where_cond = polars_ops::PartEqSurr {
         int: Some(
             inst_id
                 .iter()
                 .map(|x| ("instrument_id".to_string(), *x, polars_ops::Logic::Or))
-                .collect::<Vec<(String, i64,polars_ops::Logic)>>(),
+                .collect::<Vec<(String, i64, polars_ops::Logic)>>(),
         ),
-        string: Some(vec![(
-            "bin_size".to_string(),
-            bin_size.to_string(),
-            polars_ops::Logic::And,
-        )]),
+        string: Some(vec![("bin_size".to_string(), bin_size.to_string(), polars_ops::Logic::And)]),
         float: None,
         time_range: None,
     };
@@ -38,10 +28,7 @@ pub async fn query_feature_bin_demo(
     let df = match srt {
         Some(cols) => {
             let exprs: Vec<Expr> = cols.iter().map(|a| col(a)).collect();
-            df.lazy()
-                .sort_by_exprs(exprs, SortMultipleOptions::default())
-                .collect()
-                .unwrap()
+            df.lazy().sort_by_exprs(exprs, SortMultipleOptions::default()).collect().unwrap()
         }
         None => df,
     };
@@ -56,22 +43,18 @@ pub async fn query_feature_bin_time_constrained(
     inst_id: Vec<i64>,
     table: String,
     srt: Option<Vec<String>>,
-    time_col: String,    // e.g. Some("bin"), Some("t0"), Some("t1")
-    time_start: String,  // e.g. "2025-07-15T10:25:00Z" (RFC3339) or "7/15/2025, 10:25:00 AM"
-    time_end: String,    // same format as start
+    time_col: String,   // e.g. Some("bin"), Some("t0"), Some("t1")
+    time_start: String, // e.g. "2025-07-15T10:25:00Z" (RFC3339) or "7/15/2025, 10:25:00 AM"
+    time_end: String,   // same format as start
 ) -> surrealdb::Result<(DataFrame)> {
     let where_cond = polars_ops::PartEqSurr {
         int: Some(
             inst_id
                 .iter()
                 .map(|x| ("instrument_id".to_string(), *x, polars_ops::Logic::Or))
-                .collect::<Vec<(String, i64,polars_ops::Logic)>>(),
+                .collect::<Vec<(String, i64, polars_ops::Logic)>>(),
         ),
-        string: Some(vec![(
-            "bin_size".to_string(),
-            bin_size.to_string(),
-            polars_ops::Logic::And,
-        )]),
+        string: Some(vec![("bin_size".to_string(), bin_size.to_string(), polars_ops::Logic::And)]),
         float: None,
         // NEW: time range on an arbitrary column
         time_range: match (time_col, time_start, time_end) {
@@ -83,16 +66,12 @@ pub async fn query_feature_bin_time_constrained(
     let df = match srt {
         Some(cols) => {
             let exprs: Vec<Expr> = cols.iter().map(|a| col(a)).collect();
-            df.lazy()
-                .sort_by_exprs(exprs, SortMultipleOptions::default())
-                .collect()
-                .unwrap()
+            df.lazy().sort_by_exprs(exprs, SortMultipleOptions::default()).collect().unwrap()
         }
         None => df,
     };
     Ok(df)
 }
-
 
 #[cfg(feature = "server")]
 pub async fn query_feature_time_constrained(
@@ -101,16 +80,16 @@ pub async fn query_feature_time_constrained(
     inst_id: Vec<i64>,
     table: String,
     srt: Option<Vec<String>>,
-    time_col: String,    // e.g. Some("bin"), Some("t0"), Some("t1")
-    time_start: String,  // e.g. "2025-07-15T10:25:00Z" (RFC3339) or "7/15/2025, 10:25:00 AM"
-    time_end: String,    // same format as start
+    time_col: String,   // e.g. Some("bin"), Some("t0"), Some("t1")
+    time_start: String, // e.g. "2025-07-15T10:25:00Z" (RFC3339) or "7/15/2025, 10:25:00 AM"
+    time_end: String,   // same format as start
 ) -> surrealdb::Result<(DataFrame)> {
     let where_cond = polars_ops::PartEqSurr {
         int: Some(
             inst_id
                 .iter()
                 .map(|x| ("instrument_id".to_string(), *x, polars_ops::Logic::Or))
-                .collect::<Vec<(String, i64,polars_ops::Logic)>>(),
+                .collect::<Vec<(String, i64, polars_ops::Logic)>>(),
         ),
         string: None,
         float: None,
@@ -124,10 +103,7 @@ pub async fn query_feature_time_constrained(
     let df = match srt {
         Some(cols) => {
             let exprs: Vec<Expr> = cols.iter().map(|a| col(a)).collect();
-            df.lazy()
-                .sort_by_exprs(exprs, SortMultipleOptions::default())
-                .collect()
-                .unwrap()
+            df.lazy().sort_by_exprs(exprs, SortMultipleOptions::default()).collect().unwrap()
         }
         None => df,
     };

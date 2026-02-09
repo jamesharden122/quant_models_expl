@@ -15,8 +15,7 @@ impl HistoricalBt {
         bench_col: Option<&str>,
     ) -> PolarsResult<BacktestOutput> {
         // 1) Build sliding windows over feature columns
-        let (x_windows, end_idx): (ndarray::Array3<f32>, Vec<usize>) =
-            helpers::build_windows(df, feature_cols, params.time_steps, params.stride)?;
+        let (x_windows, end_idx): (ndarray::Array3<f32>, Vec<usize>) = helpers::build_windows(df, feature_cols, params.time_steps, params.stride)?;
 
         if end_idx.is_empty() {
             return Ok(BacktestOutput {
@@ -31,8 +30,7 @@ impl HistoricalBt {
         println!("x_windows slice: {:?}", x_windows.slice(s![0, .., ..]));
         //println!("x_windows: {:?}", x_windows);
         // 2) Inference: ONNX model expects [batch, T, F]
-        let preds: Vec<f32> = onnx_infer_candle(onnx_model_path, x_windows.into_dyn())
-            .map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
+        let preds: Vec<f32> = onnx_infer_candle(onnx_model_path, x_windows.into_dyn()).map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
 
         // 3) Align predictions w_t at window end indices
         let mut t_end_vals: Vec<i64> = Vec::with_capacity(end_idx.len());
@@ -47,13 +45,7 @@ impl HistoricalBt {
         let binding = df.column(sigma_col)?.cast(&DataType::Float64)?;
         let sig_s = binding.f64().unwrap();
         let time_i64: Option<Int64Chunked> = if let Some(tc) = time_col {
-            Some(
-                df.column(tc)?
-                    .cast(&DataType::Int64)?
-                    .i64()
-                    .unwrap()
-                    .clone(),
-            )
+            Some(df.column(tc)?.cast(&DataType::Int64)?.i64().unwrap().clone())
         } else {
             None
         };
@@ -69,11 +61,7 @@ impl HistoricalBt {
             let turn = prev_w.map(|pw| (w - pw).abs()).unwrap_or(0.0);
             prev_w = Some(w);
 
-            let r_g = if sig.abs() > (params.eps as f64) {
-                w * ((params.sigma_target as f64) / sig) * r
-            } else {
-                0.0
-            };
+            let r_g = if sig.abs() > (params.eps as f64) { w * ((params.sigma_target as f64) / sig) * r } else { 0.0 };
             let mut cost = (params.cost_lin as f64) * turn;
             if let Some((c_imp, alpha)) = params.cost_imp {
                 let denom = sig + params.eps as f64;
@@ -87,11 +75,7 @@ impl HistoricalBt {
             turnover.push(turn);
             r_gross.push(r_g);
             r_net.push(r_n);
-            t_end_vals.push(if let Some(ref ti) = time_i64 {
-                ti.get(end).unwrap_or(t_end)
-            } else {
-                t_end
-            });
+            t_end_vals.push(if let Some(ref ti) = time_i64 { ti.get(end).unwrap_or(t_end) } else { t_end });
         }
 
         let rows = DataFrame::new(vec![
@@ -140,15 +124,6 @@ impl Backtest for HistoricalBt {
         params: &BacktestParams,
         bench_col: Option<&str>,
     ) -> PolarsResult<BacktestOutput> {
-        self.run_core(
-            df,
-            feature_cols,
-            return_col,
-            sigma_col,
-            time_col,
-            onnx_model_path,
-            params,
-            bench_col,
-        )
+        self.run_core(df, feature_cols, return_col, sigma_col, time_col, onnx_model_path, params, bench_col)
     }
 }

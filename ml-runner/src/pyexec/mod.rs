@@ -1,7 +1,7 @@
 pub mod pydictstructs;
 pub mod train;
-use crate::surr_queries;
 use crate::error::{msg, Result};
+use crate::surr_queries;
 use polars::prelude::*;
 #[cfg(feature = "server")]
 use pydictstructs::{MlsLstmTrain, TseriesTfRecBento, TseriesTfRecLoad};
@@ -16,21 +16,13 @@ use surrealdb::{engine::any, sql::Bytes, Surreal};
 
 /// Load & execute a Python module from a file path, returning the live module.
 /// Registers the module in `sys.modules[name]` for subsequent imports.
-pub fn import_module_from_path<'py>(
-    py: Python<'py>,
-    name: &str,
-    path: &str,
-) -> PyResult<Bound<'py, PyModule>> {
+pub fn import_module_from_path<'py>(py: Python<'py>, name: &str, path: &str) -> PyResult<Bound<'py, PyModule>> {
     // Read the source file (binary read is fine; we'll pass &[u8] to Python)
-    let code: String = std::fs::read_to_string(path)
-        .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("Failed to read {path}: {e}")))?;
+    let code: String = std::fs::read_to_string(path).map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("Failed to read {path}: {e}")))?;
     // Convert to C-compatible strings (no interior NULs allowed).
-    let code_c = CString::new(code)
-        .map_err(|_| pyo3::exceptions::PyValueError::new_err("Python source contains NUL byte"))?;
-    let file_c = CString::new(path)
-        .map_err(|_| pyo3::exceptions::PyValueError::new_err("Path contains NUL byte"))?;
-    let name_c = CString::new(name)
-        .map_err(|_| pyo3::exceptions::PyValueError::new_err("Module name contains NUL byte"))?;
+    let code_c = CString::new(code).map_err(|_| pyo3::exceptions::PyValueError::new_err("Python source contains NUL byte"))?;
+    let file_c = CString::new(path).map_err(|_| pyo3::exceptions::PyValueError::new_err("Path contains NUL byte"))?;
+    let name_c = CString::new(name).map_err(|_| pyo3::exceptions::PyValueError::new_err("Module name contains NUL byte"))?;
     // Compile & execute
     let module = PyModule::from_code(py, code_c.as_c_str(), file_c.as_c_str(), name_c.as_c_str())?;
     // (Optional but useful) register in sys.modules so `import name` works later
@@ -49,13 +41,11 @@ pub fn write_tfrecord_from_polars(
         // Convert to Python polars.DataFrame
         // Import writer module from file
         let name = "pl2tfrecord_writer";
-        let module = import_module_from_path(py, name, writer_py_path.to_str().unwrap())
-            .map_err(|e| msg(e.to_string()))?;
+        let module = import_module_from_path(py, name, writer_py_path.to_str().unwrap()).map_err(|e| msg(e.to_string()))?;
         let func = module.getattr(attr).map_err(|e| msg(e.to_string()))?;
         println!("we got here");
         // Call: write_tfrecord_from_polars(py_df, out_path, label, compress)
-        func.call((), Some(kwargs.bind(py)))
-            .map_err(|e| msg(e.to_string()))?;
+        func.call((), Some(kwargs.bind(py))).map_err(|e| msg(e.to_string()))?;
         Ok(())
     })
 }
@@ -79,13 +69,8 @@ pub fn load_tfrecord_dataset(input_struct: TseriesTfRecLoad) -> PyResult<Py<PyAn
         let ds: Py<PyAny> = func.call(PyTuple::empty(py), Some(&kwargs))?.into();
 
         // 5) Optional: peek first batch to help debug shape/dtypes (best-effort)
-        let first = ds
-            .call_method0(py, "as_numpy_iterator")?
-            .call_method0(py, "__next__")?;
-        println!(
-            "First batch: {:?}",
-            Py::clone_ref(&first, py).as_any().to_string()
-        );
+        let first = ds.call_method0(py, "as_numpy_iterator")?.call_method0(py, "__next__")?;
+        println!("First batch: {:?}", Py::clone_ref(&first, py).as_any().to_string());
         Ok(ds)
     })
 }

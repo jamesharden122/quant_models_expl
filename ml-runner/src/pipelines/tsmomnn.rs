@@ -33,9 +33,7 @@ pub async fn run_time_series_momentum_lstm(
 }
 
 #[cfg(feature = "server")]
-pub async fn back_test_time_series_momentum_lstm(
-    backtest_params: RunBacktestRequest,
-) -> Result<(serde_json::Value), ServerFnError> {
+pub async fn back_test_time_series_momentum_lstm(backtest_params: RunBacktestRequest) -> Result<(serde_json::Value), ServerFnError> {
     let output = run_backtest_series(backtest_params).await?;
     Ok((output))
 }

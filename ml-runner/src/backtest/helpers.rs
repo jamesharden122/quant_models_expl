@@ -117,19 +117,12 @@ fn default_out_path() -> String {
 }
 impl Default for OutputCfg {
     fn default() -> Self {
-        Self {
-            csv_path: default_out_path(),
-        }
+        Self { csv_path: default_out_path() }
     }
 }
 
 /// Build sliding windows [N, T, F] and collect end indices in the original df.
-pub fn build_windows(
-    df: &DataFrame,
-    feature_cols: &[String],
-    time_steps: usize,
-    stride: usize,
-) -> PolarsResult<(ndarray::Array3<f32>, Vec<usize>)> {
+pub fn build_windows(df: &DataFrame, feature_cols: &[String], time_steps: usize, stride: usize) -> PolarsResult<(ndarray::Array3<f32>, Vec<usize>)> {
     // Select & cast once
     let fdf = df
         .select(feature_cols.iter().map(|s| s.as_str()).collect::<Vec<_>>())?
@@ -181,7 +174,6 @@ pub fn build_windows(
         i += stride;
     }
 
-    let arr = ndarray::Array::from_shape_vec((win_count, time_steps, f), batches)
-        .map_err(|_| PolarsError::ComputeError("shape mismatch".into()))?;
+    let arr = ndarray::Array::from_shape_vec((win_count, time_steps, f), batches).map_err(|_| PolarsError::ComputeError("shape mismatch".into()))?;
     Ok((arr, end_idx))
 }

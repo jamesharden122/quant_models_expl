@@ -43,17 +43,8 @@ fn make_backtest(kind: BacktestKind) -> Box<dyn Backtest + Send + Sync> {
 }
 
 #[cfg(feature = "server")]
-pub async fn run_backtest_series(
-    req: RunBacktestRequest,
-) -> Result<(serde_json::Value), ServerFnError> {
-    let db = ml_backend::surreal_queries::make_db(
-        req.db.url.as_str(),
-        req.db.user.as_str(),
-        req.db.pass.as_str(),
-        req.db.ns.as_str(),
-        req.db.dbname.as_str(),
-    )
-    .await?;
+pub async fn run_backtest_series(req: RunBacktestRequest) -> Result<(serde_json::Value), ServerFnError> {
+    let db = ml_backend::surreal_queries::make_db(req.db.url.as_str(), req.db.user.as_str(), req.db.pass.as_str(), req.db.ns.as_str(), req.db.dbname.as_str()).await?;
 
     println!("logged in");
 
@@ -88,19 +79,14 @@ pub async fn run_backtest_series(
     )?;
 
     // Write the per-step DataFrame
-    let mut file = std::fs::File::create(&req.output.csv_path)
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
+    let mut file = std::fs::File::create(&req.output.csv_path).map_err(|e| ServerFnError::new(e.to_string()))?;
     polars::prelude::CsvWriter::new(&mut file)
         .include_header(true)
         .finish(&mut out.rows.clone()) // keep your current behavior
         .map_err(|e| ServerFnError::new(e.to_string()))?;
 
     // Write JSON summary next to it
-    let summary_path = format!(
-        "{}{}",
-        req.output.csv_path.trim_end_matches(".csv"),
-        "_summary.json"
-    );
+    let summary_path = format!("{}{}", req.output.csv_path.trim_end_matches(".csv"), "_summary.json");
     let summary = serde_json::json!({
         "sharpe": out.sharpe,
         "sortino": out.sortino,
@@ -111,8 +97,7 @@ pub async fn run_backtest_series(
         "cols": out.rows.width(),
         "path": req.output.csv_path,
     });
-    std::fs::write(&summary_path, serde_json::to_vec_pretty(&summary).unwrap())
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
+    std::fs::write(&summary_path, serde_json::to_vec_pretty(&summary).unwrap()).map_err(|e| ServerFnError::new(e.to_string()))?;
     println!("{:?}", summary);
     Ok((summary))
 }

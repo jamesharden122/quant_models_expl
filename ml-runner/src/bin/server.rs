@@ -10,13 +10,10 @@ use axum::{
 };
 use dioxus::prelude::*;
 use ml_backend::{
-    featscreate::{FeatList, globalindexes::GlobalIndexes, momindexes::MomFactor},
+    featscreate::{globalindexes::GlobalIndexes, momindexes::MomFactor, FeatList},
     surreal_queries::DbParams,
 };
-use ml_runner::backtest::helpers::{
-    BacktestKind, BacktestParams, ColumnCfg, DataQuery, FeatureStage, InferenceCfg, OutputCfg,
-    RunBacktestRequest,
-};
+use ml_runner::backtest::helpers::{BacktestKind, BacktestParams, ColumnCfg, DataQuery, FeatureStage, InferenceCfg, OutputCfg, RunBacktestRequest};
 use ml_runner::pipelines::tsmomnn::back_test_time_series_momentum_lstm;
 use ml_runner::pipelines::tsmomnn::run_time_series_momentum_lstm;
 use ml_runner::pyexec::pydictstructs::{MlsLstmTrain, TseriesTfRecBento, TseriesTfRecLoad};
@@ -44,10 +41,7 @@ async fn main() {
         .route("/health", get(|| async { "ok" }))
         .route("/tsmomnn/backtest", get(tsmomnn_backtest_get))
         .route("/tsmomnn/backtest", post(tsmomnn_backtest_post))
-        .route(
-            "/tsmomnn/train",
-            get(tsmomnn_train_get).post(tsmomnn_train_post),
-        )
+        .route("/tsmomnn/train", get(tsmomnn_train_get).post(tsmomnn_train_post))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any) // in prod, list your exact origins
@@ -123,10 +117,7 @@ struct BtQuery {
 async fn tsmomnn_backtest_get(Query(q): Query<BtQuery>) -> impl IntoResponse {
     // Helper parsers
     fn csv_list(s: &str) -> Vec<String> {
-        s.split(',')
-            .map(|x| x.trim().to_string())
-            .filter(|x| !x.is_empty())
-            .collect()
+        s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()
     }
     fn csv_i64(s: &str) -> Vec<i64> {
         s.split(',').filter_map(|x| x.trim().parse().ok()).collect()
@@ -161,61 +152,32 @@ async fn tsmomnn_backtest_get(Query(q): Query<BtQuery>) -> impl IntoResponse {
                 println!("Cloned Request: {:?}", req.clone());
                 return match back_test_time_series_momentum_lstm(req).await {
                     Ok((res)) => (StatusCode::OK, Json(res)),
-                    Err(e) => (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"status":"error","message": e.to_string()})),
-                    ),
+                    Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status":"error","message": e.to_string()}))),
                 };
             }
 
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"status":"error","message": format!("invalid req_json: {}", e)})),
-                )
-            }
+            Err(e) => return (StatusCode::BAD_REQUEST, Json(json!({"status":"error","message": format!("invalid req_json: {}", e)}))),
         }
     }
 
     // Defaults with overrides
-    let db =
-        DbParams {
-            url: q.db_url.clone().unwrap_or_else(|| {
-                std::env::var("SUR_URL").unwrap_or_else(|_| {
-                    "https://quant-platform-06cb0tpcrpsspao10de28go15s.aws-use1.surreal.cloud/rpc"
-                        .to_string()
-                })
-            }),
-            user: q.db_user.clone().unwrap_or_else(|| {
-                std::env::var("SUR_USER").unwrap_or_else(|_| "root".to_string())
-            }),
-            pass: q.db_pass.clone().unwrap_or_else(|| {
-                std::env::var("SUR_PASS").unwrap_or_else(|_| "root".to_string())
-            }),
-            ns: q.db_ns.clone().unwrap_or_else(|| {
-                std::env::var("SUR_NS").unwrap_or_else(|_| "equities".to_string())
-            }),
-            dbname: q.db_db.clone().unwrap_or_else(|| {
-                std::env::var("SUR_DB").unwrap_or_else(|_| "historical".to_string())
-            }),
-        };
+    let db = DbParams {
+        url: q
+            .db_url
+            .clone()
+            .unwrap_or_else(|| std::env::var("SUR_URL").unwrap_or_else(|_| "https://quant-platform-06cb0tpcrpsspao10de28go15s.aws-use1.surreal.cloud/rpc".to_string())),
+        user: q.db_user.clone().unwrap_or_else(|| std::env::var("SUR_USER").unwrap_or_else(|_| "root".to_string())),
+        pass: q.db_pass.clone().unwrap_or_else(|| std::env::var("SUR_PASS").unwrap_or_else(|_| "root".to_string())),
+        ns: q.db_ns.clone().unwrap_or_else(|| std::env::var("SUR_NS").unwrap_or_else(|_| "equities".to_string())),
+        dbname: q.db_db.clone().unwrap_or_else(|| std::env::var("SUR_DB").unwrap_or_else(|_| "historical".to_string())),
+    };
 
-    let inst_id = q
-        .inst_ids
+    let inst_id = q.inst_ids.as_deref().map(csv_i64).unwrap_or_else(|| vec![8147, 11667]);
+    let column_set = q
+        .column_set
         .as_deref()
-        .map(csv_i64)
-        .unwrap_or_else(|| vec![8147, 11667]);
-    let column_set = q.column_set.as_deref().map(csv_list).unwrap_or_else(|| {
-        vec![
-            "instrument_id".into(),
-            "bin".into(),
-            "t0".into(),
-            "t1".into(),
-            "mean_price".into(),
-            "ret".into(),
-            "sigma".into(),
-        ]
-    });
+        .map(csv_list)
+        .unwrap_or_else(|| vec!["instrument_id".into(), "bin".into(), "t0".into(), "t1".into(), "mean_price".into(), "ret".into(), "sigma".into()]);
     let sort = q.sort.as_deref().map(csv_list);
     let bin_size = q.bin_size.clone().unwrap_or_else(|| "5m".into());
     let table = q.table.clone().unwrap_or_else(|| "equities_returns".into());
@@ -236,11 +198,7 @@ async fn tsmomnn_backtest_get(Query(q): Query<BtQuery>) -> impl IntoResponse {
     let return_col = q.return_col.clone().unwrap_or_else(|| "ret".into());
     let sigma_col = q.sigma_col.clone().unwrap_or_else(|| "sigma".into());
 
-    let kind = q
-        .kind
-        .as_deref()
-        .map(parse_kind)
-        .unwrap_or(BacktestKind::Historical);
+    let kind = q.kind.as_deref().map(parse_kind).unwrap_or(BacktestKind::Historical);
     let params = BacktestParams {
         kind,
         time_steps: q.time_steps.unwrap_or(5),
@@ -253,23 +211,15 @@ async fn tsmomnn_backtest_get(Query(q): Query<BtQuery>) -> impl IntoResponse {
         ann_factor: q.ann_factor.unwrap_or(252.0),
     };
 
-    let out_csv = q
-        .out_csv
-        .clone()
-        .unwrap_or_else(|| "../tmp_data/backtest_output.csv".into());
-    let onnx_model_path = q
-        .model_path
-        .clone()
-        .unwrap_or_else(|| "./../ml-project/models/saved/test/final_model.onnx".into());
+    let out_csv = q.out_csv.clone().unwrap_or_else(|| "../tmp_data/backtest_output.csv".into());
+    let onnx_model_path = q.model_path.clone().unwrap_or_else(|| "./../ml-project/models/saved/test/final_model.onnx".into());
 
     let time = match (&q.time_col_name, &q.time_start, &q.time_end) {
-        (Some(time_col), Some(time_start), Some(time_end)) => {
-            Some(ml_runner::backtest::helpers::TimeConst {
-                time_col: time_col.clone(),
-                time_start: time_start.clone(),
-                time_end: time_end.clone(),
-            })
-        }
+        (Some(time_col), Some(time_start), Some(time_end)) => Some(ml_runner::backtest::helpers::TimeConst {
+            time_col: time_col.clone(),
+            time_start: time_start.clone(),
+            time_end: time_end.clone(),
+        }),
         _ => None,
     };
 
@@ -282,9 +232,7 @@ async fn tsmomnn_backtest_get(Query(q): Query<BtQuery>) -> impl IntoResponse {
             table,
             sort,
         },
-        features: FeatureStage {
-            feature_transformer_names: feats,
-        },
+        features: FeatureStage { feature_transformer_names: feats },
         inference: InferenceCfg { onnx_model_path },
         cols: ColumnCfg {
             feature_cols,
@@ -325,10 +273,7 @@ async fn tsmomnn_backtest_get(Query(q): Query<BtQuery>) -> impl IntoResponse {
 async fn tsmomnn_backtest_post(Json(req): Json<RunBacktestRequest>) -> impl IntoResponse {
     match back_test_time_series_momentum_lstm(req).await {
         Ok((res)) => (StatusCode::OK, Json(json!({"status":"ok"}))),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"status":"error","message": e.to_string()})),
-        ),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status":"error","message": e.to_string()}))),
     }
 }
 
@@ -362,10 +307,7 @@ struct TrainReq {
 ///                                 "train": {"trainer_path":"../ml-project/models/mls_lstm_trainer.py","class":"MLSLSTMTrainer","attr":"train","time_steps":5,"input_dim":7,"val_split":0.1,"test_split":0.1,"epochs":10,"batch_size":null,"verbose":1,"shuffle_before_split":false,"seed":42,"save_every_epoch":false,"save_weights_only":false,"monitor":"val_loss","save_best_only":true,"run_name":"test"}}
 ///                               ' http://127.0.0.1:8080/tsmomnn/train
 async fn tsmomnn_train_get(Query(q): Query<TrainQuery>) -> impl IntoResponse {
-    println!(
-        "{:?}",
-        "running the train routine for time series momentum lstm network!"
-    );
+    println!("{:?}", "running the train routine for time series momentum lstm network!");
     let Some(req_json) = &q.req_json else {
         return (
             StatusCode::BAD_REQUEST,
@@ -377,19 +319,11 @@ async fn tsmomnn_train_get(Query(q): Query<TrainQuery>) -> impl IntoResponse {
     };
     pyo3::prepare_freethreaded_python();
     match serde_json::from_str::<TrainReq>(req_json) {
-        Ok(req) => {
-            match run_time_series_momentum_lstm(req.db, req.write, req.load, req.train).await {
-                Ok((val)) => (StatusCode::OK, Json(json!(val))),
-                Err(e) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"status":"error","message": e.to_string()})),
-                ),
-            }
-        }
-        Err(e) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"status":"error","message": format!("invalid req_json: {}", e)})),
-        ),
+        Ok(req) => match run_time_series_momentum_lstm(req.db, req.write, req.load, req.train).await {
+            Ok((val)) => (StatusCode::OK, Json(json!(val))),
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status":"error","message": e.to_string()}))),
+        },
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"status":"error","message": format!("invalid req_json: {}", e)}))),
     }
 }
 
@@ -408,10 +342,7 @@ async fn tsmomnn_train_post(Json(req): Json<TrainReq>) -> impl IntoResponse {
     pyo3::prepare_freethreaded_python();
     match run_time_series_momentum_lstm(req.db, req.write, req.load, req.train).await {
         Ok((val)) => (StatusCode::OK, Json(json!(val))),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"status":"error","message": e.to_string()})),
-        ),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status":"error","message": e.to_string()}))),
     }
 }
 

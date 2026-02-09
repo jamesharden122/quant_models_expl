@@ -12,15 +12,9 @@ fn import_module_from_temp_py_file() -> Result<(), Box<dyn std::error::Error>> {
     // Import and call via the bridge
     pyo3::prepare_freethreaded_python();
     pyo3::Python::with_gil(|py| {
-        let module =
-            ml_runner::pyexec::import_module_from_path(py, "pyo3_run", path.to_str().unwrap())
-                .expect("import temp module");
+        let module = ml_runner::pyexec::import_module_from_path(py, "pyo3_run", path.to_str().unwrap()).expect("import temp module");
         let func = module.getattr("ping").expect("get attr");
-        let out: String = func
-            .call0()
-            .expect("call ping")
-            .extract()
-            .expect("extract str");
+        let out: String = func.call0().expect("call ping").extract().expect("extract str");
         assert_eq!(out, "pong");
     });
     Ok(())

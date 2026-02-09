@@ -17,15 +17,11 @@ pub fn init_candle_backend() {
 #[cfg(feature = "server")]
 fn validate_against_model_shape(model_shape: &[i64], got: &[usize]) -> Result<()> {
     if model_shape.len() != got.len() {
-        return Err(msg(format!(
-            "rank mismatch: model={model_shape:?}, got={got:?}"
-        )));
+        return Err(msg(format!("rank mismatch: model={model_shape:?}, got={got:?}")));
     }
     for (i, (m, g)) in model_shape.iter().zip(got).enumerate() {
         if *m >= 0 && (*m as usize) != *g {
-            return Err(msg(format!(
-                "dim {i} mismatch: model expects {m}, got {g}"
-            )));
+            return Err(msg(format!("dim {i} mismatch: model expects {m}, got {g}")));
         }
     }
     println!("{:?}", "validated");
@@ -46,12 +42,9 @@ pub fn onnx_infer_candle(file_path: &str, input: ArrayD<f32>) -> Result<Vec<f32>
 
     validate_against_model_shape(&model_shape, input.shape())?;
 
-    let tensor = ort::value::Tensor::from_array(input)
-        .map_err(|e| msg(format!("failed to convert ndarray to ort tensor: {e}")))?;
+    let tensor = ort::value::Tensor::from_array(input).map_err(|e| msg(format!("failed to convert ndarray to ort tensor: {e}")))?;
     let x = ort::inputs![tensor];
-    let mut outputs = session
-        .run(x)
-        .map_err(|e| msg(format!("onnx runtime (candle backend) failed: {e}")))?;
+    let mut outputs = session.run(x).map_err(|e| msg(format!("onnx runtime (candle backend) failed: {e}")))?;
 
     let val = &outputs[0];
     match val.try_extract_tensor::<f32>() {

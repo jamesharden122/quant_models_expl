@@ -3,6 +3,7 @@ pub mod backtest;
 pub mod error;
 #[cfg(feature = "server")]
 pub mod inference;
+#[cfg(feature = "server")]
 pub mod pipelines;
 pub mod pyexec;
 #[cfg(feature = "server")]
@@ -22,12 +23,7 @@ fn TrainingForm() -> Element {
         evt.prevent_default();
         // In web builds, you can wire this to server functions via fullstack routing.
         // Left as a stub to keep compilation simple.
-        println!(
-            "Submit clicked: trainer={}, tfrec={}, call={}",
-            trainer_py(),
-            tfrecord_path(),
-            callable()
-        );
+        println!("Submit clicked: trainer={}, tfrec={}, call={}", trainer_py(), tfrecord_path(), callable());
     };
 
     rsx! {

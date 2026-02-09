@@ -31,11 +31,7 @@ pub fn run_mls_lstm_training(
         }
 
         // 2) Import module
-        let module = super::import_module_from_path(
-            py,
-            "trainer_module",
-            trainer_py_path.to_str().unwrap(),
-        )?;
+        let module = super::import_module_from_path(py, "trainer_module", trainer_py_path.to_str().unwrap())?;
 
         // 3) Get class symbol
         let attr = module.getattr(callable_name)?;

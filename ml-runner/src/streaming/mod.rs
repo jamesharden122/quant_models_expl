@@ -5,9 +5,7 @@ use crate::pyexec::pydictstructs::{TseriesTfRecBento, TseriesTfRecWrdsMarket};
 use crate::surr_queries;
 use dioxus::prelude::*;
 #[cfg(feature = "server")]
-use ml_backend::{
-    featscreate::apply_by_names, polars_ops, surreal_queries, surreal_queries::DbParams,
-};
+use ml_backend::{featscreate::apply_by_names, polars_ops, surreal_queries, surreal_queries::DbParams};
 #[cfg(feature = "server")]
 use polars::prelude::*;
 use pyo3::prelude::*;
@@ -42,11 +40,7 @@ pub async fn streaming_pipe(
     .await?;
     let mut df: DataFrame = surr_queries::query_feature_bin_demo(
         &db,
-        kwargs_struct
-            .column_set
-            .iter()
-            .map(|s| s.as_str())
-            .collect(),
+        kwargs_struct.column_set.iter().map(|s| s.as_str()).collect(),
         kwargs_struct.query_params.0, //bin_size
         kwargs_struct.query_params.1, //ints_ids
         kwargs_struct.srt,
@@ -54,9 +48,7 @@ pub async fn streaming_pipe(
     .await?;
     // Apply feature engineers by name (implemented in bento_queries::featscreate)
     if let Some(names) = kwargs_struct.feature_names {
-        df = apply_by_names(df, names)
-            .await
-            .map_err(|e| ServerFnError::new(e.to_string()))?;
+        df = apply_by_names(df, names).await.map_err(|e| ServerFnError::new(e.to_string()))?;
     }
     println!("streamed shape: {:?}", df.shape());
     println!("{:?}", df);
@@ -70,12 +62,8 @@ pub async fn streaming_pipe(
         .collect();
     //Set Python objects
     let py_df = PyDataFrame(df);
-    let writer = kwargs_struct
-        .writer_path
-        .unwrap_or_else(|| "../ml-project/py/pl2tfrecord_writer.py".to_string());
-    let out_path = kwargs_struct
-        .out_path
-        .unwrap_or_else(|| "../tmp_data/data.tfrecord".to_string());
+    let writer = kwargs_struct.writer_path.unwrap_or_else(|| "../ml-project/py/pl2tfrecord_writer.py".to_string());
+    let out_path = kwargs_struct.out_path.unwrap_or_else(|| "../tmp_data/data.tfrecord".to_string());
     // Augment provided kwargs with df/path/feature_cols
     let kwargs = Python::with_gil(|py| -> PyResult<Py<PyDict>> {
         let kw = kw_temp.to_pydict(py)?;
@@ -91,8 +79,7 @@ pub async fn streaming_pipe(
     })
     .map_err(|e| ServerFnError::new(e.to_string()))?;
     println!("{:?}", "Dict Sucessfully created");
-    pyexec::write_tfrecord_from_polars(Path::new(&writer), kwargs_struct.attr.as_str(), kwargs)
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
+    pyexec::write_tfrecord_from_polars(Path::new(&writer), kwargs_struct.attr.as_str(), kwargs).map_err(|e| ServerFnError::new(e.to_string()))?;
     Ok(())
 }
 
@@ -110,19 +97,11 @@ pub async fn streaming_pipe_wrds_duck(
     //Read data from parquet file to the duck database//
     //************************************************//
     let conn = if load_frm_parq {
-        let conn = Arc::new(Mutex::new(
-            start_duck_db("4GB", 14)
-                .await
-                .expect("duckdb in-memory should start"),
-        ));
+        let conn = Arc::new(Mutex::new(start_duck_db("4GB", 14).await.expect("duckdb in-memory should start")));
         dbt.ingest(conn.clone(), pth.unwrap()).await.unwrap();
         conn
     } else {
-        Arc::new(Mutex::new(
-            open_duck_db_from_file(pth.unwrap(), "4GB", 14)
-                .await
-                .expect("duckdb in-memory should start"),
-        ))
+        Arc::new(Mutex::new(open_duck_db_from_file(pth.unwrap(), "4GB", 14).await.expect("duckdb in-memory should start")))
     };
     {
         let conn = conn.lock().unwrap();
@@ -133,33 +112,13 @@ pub async fn streaming_pipe_wrds_duck(
     //Filter data base)d on the tickers and a date tuple and convert to dataframe//
     //*************************************************//
     let tvec = kwargs_struct.query_params.clone().unwrap().0;
-    let (d1, d2) = kwargs_struct
-        .query_params
-        .as_ref()
-        .map(|(_, d1, d2)| (*d1, *d2))
-        .unwrap();
+    let (d1, d2) = kwargs_struct.query_params.as_ref().map(|(_, d1, d2)| (*d1, *d2)).unwrap();
     let data: Vec<polars::frame::row::Row> = match dbt {
-        DbType::GlobalDailyIndex => {
-            crsp::GlobalDailyIndex::read_gdi_batch(conn.clone(), "tic".to_string(), tvec, (d1, d2))
-                .await
-                .unwrap()
-        }
-        DbType::GlobalRets => world_indices::GlobalRets::read_range(conn.clone(), (d1, d2))
-            .await
-            .unwrap(),
-        DbType::UsMarket => usindexes::UsMarketIndex::read_range(conn.clone(), (d1, d2))
-            .await
-            .unwrap(),
-        DbType::GlobalEquities => {
-            global_equities::GlobalEquities::read_range(conn.clone(), (d1, d2))
-                .await
-                .unwrap()
-        }
-        other => {
-            return Err(ServerFnError::new(format!(
-                "DbType {other:?} is not supported by streaming_pipe_wrds_duck"
-            )))
-        }
+        DbType::GlobalDailyIndex => crsp::GlobalDailyIndex::read_gdi_batch(conn.clone(), "tic".to_string(), tvec, (d1, d2)).await.unwrap(),
+        DbType::GlobalRets => world_indices::GlobalRets::read_range(conn.clone(), (d1, d2)).await.unwrap(),
+        DbType::UsMarket => usindexes::UsMarketIndex::read_range(conn.clone(), (d1, d2)).await.unwrap(),
+        DbType::GlobalEquities => global_equities::GlobalEquities::read_range(conn.clone(), (d1, d2)).await.unwrap(),
+        other => return Err(ServerFnError::new(format!("DbType {other:?} is not supported by streaming_pipe_wrds_duck"))),
     };
     let mut df = DataFrame::from_rows_and_schema(&data, &kwargs_struct.polars_schema).unwrap();
     df = match pre_features_filter {
@@ -170,9 +129,7 @@ pub async fn streaming_pipe_wrds_duck(
     //Apply feature engineering functions by there names//
     //**************************************************//
     if let Some(names) = kwargs_struct.feature_names {
-        df = apply_by_names(df, names)
-            .await
-            .map_err(|e| ServerFnError::new(e.to_string()))?;
+        df = apply_by_names(df, names).await.map_err(|e| ServerFnError::new(e.to_string()))?;
     }
     println!("streamed shape: {:?}", df.shape());
     println!("{:?}", df);
@@ -186,18 +143,10 @@ pub async fn streaming_pipe_wrds_duck(
         .filter(|c| !kwargs_struct.exclude_cols.iter().any(|ex| ex == c))
         .map(|c| c.to_string())
         .collect();
-    println!(
-        "Dataframe Columns: {:?} /n Potential Feature Columns: {:?}",
-        df.get_column_names_str(),
-        feature_cols
-    );
+    println!("Dataframe Columns: {:?} /n Potential Feature Columns: {:?}", df.get_column_names_str(), feature_cols);
     let py_df = PyDataFrame(df);
-    let _writer = kwargs_struct
-        .writer_path
-        .unwrap_or_else(|| "../ml-project/py/pl2tfrecord_writer.py".to_string());
-    let out_path = kwargs_struct
-        .out_path
-        .unwrap_or_else(|| "../tmp_data/data.tfrecord".to_string());
+    let _writer = kwargs_struct.writer_path.unwrap_or_else(|| "../ml-project/py/pl2tfrecord_writer.py".to_string());
+    let out_path = kwargs_struct.out_path.unwrap_or_else(|| "../tmp_data/data.tfrecord".to_string());
 
     let _kwargs = Python::with_gil(|py| -> PyResult<Py<PyDict>> {
         let kw = kw_temp.to_pydict(py)?;

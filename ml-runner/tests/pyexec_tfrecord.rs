@@ -70,12 +70,7 @@ fn write_tfrecord_from_polars_smoke() {
     .unwrap();
 
     // Call your writer with a FILE path
-    pyexec::write_tfrecord_from_polars(
-        writer_path().as_path(),
-        "write_timeseries_tfrecord_from_polars",
-        kwargs,
-    )
-    .expect("write tfrecord");
+    pyexec::write_tfrecord_from_polars(writer_path().as_path(), "write_timeseries_tfrecord_from_polars", kwargs).expect("write tfrecord");
 
     // Optional: assert the file exists and is non-empty
     let meta = fs::metadata(&out_path).expect("stat output file");
@@ -91,12 +86,12 @@ fn load_tfrecord_dataset_smoke() {
     let record_path = tmp_file("test_read.tfrecord");
     // Create a minimal TFRecord if missing
     let df = df!(
-            "x" => &[1.0f32, 2.0, 3.0, 1.0, 2.0, 3.7, 4.0, 5.0, 3.0, 2.0, 12.7, 3.0, 4.0, 31.0, 23.0, 4.0, 2.0, 2.0],
-            "z" => [1i64, 0, 1, 8, 2, 30, 4, 50, 3, 2, 12, 3, 4, 31, 23, 4, 2, 2],
-            "y" => &[1i64, 0, 1, 1, 2, 3, 4, 5, 3, 2, 12, 3, 4, 31, 23, 4, 2, 2],
-            "label" => &[0i64, 1, 0, 1, 2, 3, 4, 5, 3, 2, 12, 3, 4, 31, 23, 4, 2, 2]
-            )
-            .expect("df build");
+    "x" => &[1.0f32, 2.0, 3.0, 1.0, 2.0, 3.7, 4.0, 5.0, 3.0, 2.0, 12.7, 3.0, 4.0, 31.0, 23.0, 4.0, 2.0, 2.0],
+    "z" => [1i64, 0, 1, 8, 2, 30, 4, 50, 3, 2, 12, 3, 4, 31, 23, 4, 2, 2],
+    "y" => &[1i64, 0, 1, 1, 2, 3, 4, 5, 3, 2, 12, 3, 4, 31, 23, 4, 2, 2],
+    "label" => &[0i64, 1, 0, 1, 2, 3, 4, 5, 3, 2, 12, 3, 4, 31, 23, 4, 2, 2]
+    )
+    .expect("df build");
     let py_df = PyDataFrame(df.clone());
     /*
          let kwargs: Py<PyDict> = Python::with_gil(|py| -> PyResult<Py<PyDict>> {
@@ -126,12 +121,7 @@ fn load_tfrecord_dataset_smoke() {
     })
     .unwrap();
     // Call your writer with a FILE path
-    pyexec::write_tfrecord_from_polars(
-        writer_path().as_path(),
-        "write_timeseries_tfrecord_from_polars".into(),
-        kwargs,
-    )
-    .expect("write tfrecord");
+    pyexec::write_tfrecord_from_polars(writer_path().as_path(), "write_timeseries_tfrecord_from_polars".into(), kwargs).expect("write tfrecord");
     // Feature spec matching the written DF
     let mut spec = BTreeMap::new();
     spec.insert("x".to_string(), "float32".to_string());
@@ -150,8 +140,7 @@ fn load_tfrecord_dataset_smoke() {
         gzip: true,
         include_cost: None,
     };
-    let ds = pyexec::load_tfrecord_dataset(inp_param)
-        .expect("load_tfrecord_dataset should return a PyObject");
+    let ds = pyexec::load_tfrecord_dataset(inp_param).expect("load_tfrecord_dataset should return a PyObject");
 
     // We only assert that a Python object is returned without exceptions.
     println!("{:?}", ds);
